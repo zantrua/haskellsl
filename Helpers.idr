@@ -19,3 +19,6 @@ joinShow as = join $ map show as
 
 total joinSepShow : Show a => String -> List a -> String
 joinSepShow sep as = joinSep sep $ map show as
+
+implementation [blank] Show a => Show (Maybe a) where
+    show a = maybe "" show a
