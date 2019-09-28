@@ -8,12 +8,9 @@ import LSL.Syntax
 %access public export
 
 interface Checkable r where
-	check : Map Symbol SymbolType -> r -> SymbolType -> Maybe Bool
-	checkValue : Map Symbol SymbolType -> r -> LSLType -> Maybe Bool
 	infer : Map Symbol SymbolType -> r -> Maybe SymbolType
 	inferValue : Map Symbol SymbolType -> r -> Maybe LSLType
 	
-	checkValue ctx v t = check ctx v (ValueType t)
 	inferValue ctx v = do
 		v <- infer ctx v
 		case v of
@@ -24,24 +21,29 @@ private total inferList : Checkable r => Map Symbol SymbolType -> List r -> Mayb
 inferList ctx as = toMaybe (andmap (isJust . infer ctx) as) ()
 
 Checkable Symbol where
-	check ctx v t = do
-		v <- lookup v ctx
-		Just $ v == t
-		
 	infer ctx v = lookup v ctx
 	
 Checkable Literal where
-	check ctx v t = do
-		v <- infer ctx v
-		Just $ v == t
-	
 	infer _ (IntLit _) = Just $ ValueType LSLInteger
 	infer _ (FloatLit _) = Just $ ValueType LSLFloat
 	infer _ (StringLit _) = Just $ ValueType LSLString
 	infer _ (KeyLit _) = Just $ ValueType LSLKey
-	infer _ (VectorLit _ _ _) = Just $ ValueType LSLVector
-	infer _ (RotationLit _ _ _ _) = Just $ ValueType LSLRotation
 	
+public export check : Checkable r => Map Symbol SymbolType -> r -> SymbolType -> Maybe Bool
+check ctx a t = do
+	a <- infer ctx a
+	Just $ a == t
+	
+public export checkValue : Checkable r => Map Symbol SymbolType -> r -> LSLType -> Maybe Bool
+checkValue ctx a t = do
+	a <- inferValue ctx a
+	Just $ a == t
+
+private total numeric : LSLType -> Bool
+numeric LSLInteger = True
+numeric LSLFloat = True
+numeric _ = False
+
 private total castable : LSLType -> LSLType -> Bool
 castable LSLInteger LSLFloat = True
 castable LSLFloat LSLInteger = True
@@ -117,171 +119,23 @@ inferComp LSLFloat LSLInteger = Just LSLInteger
 inferComp _ _ = Nothing
 
 Checkable Expr where
-	check ctx (LitExpr a) t = check ctx a t
-	
-	check ctx (VarExpr v) t = check ctx v t
-	
-	check ctx (ParenExpr a) t = check ctx a t
-	
-	check ctx (ListExpr as) t = toMaybe (foldr (\e, a => isJust (inferValue ctx e) && a) True as) (t == ValueType LSLList)
-	
-	check ctx (CastExpr b a) t = do
-		a <- inferValue ctx a
-		Just $ castable a b && t == ValueType b
-	
-	check ctx (NotExpr a) t = do
-		a <- checkValue ctx a LSLInteger
-		Just $ t == ValueType LSLInteger
-	check ctx (AndExpr a b) t = do
-		a <- checkValue ctx a LSLInteger
-		b <- checkValue ctx b LSLInteger
-		Just $ t == ValueType LSLInteger
-	check ctx (OrExpr a b) t = do
-		a <- checkValue ctx a LSLInteger
-		b <- checkValue ctx b LSLInteger
-		Just $ t == ValueType LSLInteger
-	
-	check ctx (BNotExpr a) t = do
-		a <- checkValue ctx a LSLInteger
-		Just $ t == ValueType LSLInteger
-	check ctx (BAndExpr a b) t = do
-		a <- checkValue ctx a LSLInteger
-		b <- checkValue ctx b LSLInteger
-		Just $ t == ValueType LSLInteger
-	check ctx (BOrExpr a b) t = do
-		a <- checkValue ctx a LSLInteger
-		b <- checkValue ctx b LSLInteger
-		Just $ t == ValueType LSLInteger
-	check ctx (BXorExpr a b) t = do
-		a <- checkValue ctx a LSLInteger
-		b <- checkValue ctx b LSLInteger
-		Just $ t == ValueType LSLInteger
-	
-	check ctx (NegExpr a) t = do
-		a <- inferValue ctx a
-		Just $ negable a && ValueType a == t
-	check ctx (AddExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		t' <- inferAdd a b
-		Just $ t == ValueType t'
-	check ctx (SubExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		t' <- inferSub a b
-		Just $ t == ValueType t'
-	check ctx (MulExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		t' <- inferMul a b
-		Just $ t == ValueType t'
-	check ctx (DivExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		t' <- inferDiv a b
-		Just $ t == ValueType t'
-	check ctx (ModExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		t' <- inferMod a b
-		Just $ t == ValueType t'
-
-	check ctx (SHLExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		Just $ a == LSLInteger && b == LSLInteger && t == ValueType LSLInteger
-	check ctx (SHRExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		Just $ a == LSLInteger && b == LSLInteger && t == ValueType LSLInteger
-		
-	check ctx (EqExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		t' <- inferEq a b
-		Just $ t == ValueType t'
-	check ctx (NeExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		t' <- inferEq a b
-		Just $ t == ValueType t'
-	check ctx (LtExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		t' <- inferComp a b
-		Just $ t == ValueType t'
-	check ctx (LteExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		t' <- inferComp a b
-		Just $ t == ValueType t'
-	check ctx (GtExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		t' <- inferComp a b
-		Just $ t == ValueType t'
-	check ctx (GteExpr a b) t = do
-		a <- inferValue ctx a
-		b <- inferValue ctx b
-		t' <- inferComp a b
-		Just $ t == ValueType t'
-		
-	check ctx (FnExpr f as) t = do
-		f <- infer ctx f
-		case f of
-			FnType r as' => let checks = zipWith (checkValue ctx) as as' in
-				toMaybe (andmap (maybe False id) checks) $ maybe NoneType ValueType r == t
-			_ => Nothing
-
-	check ctx (SetExpr v a) t = do
-		v <- inferValue ctx v
-		a <- inferValue ctx a
-		toMaybe (v == a) $ ValueType v == t
-	check ctx (SetAddExpr v a) t = do
-		v <- inferValue ctx v
-		a <- inferValue ctx a
-		t' <- inferAdd v a
-		Just $ t == ValueType t'
-	check ctx (SetSubExpr v a) t = do
-		v <- inferValue ctx v
-		a <- inferValue ctx a
-		t' <- inferSub v a
-		Just $ t == ValueType t'
-	check ctx (SetMulExpr v a) t = do
-		v <- inferValue ctx v
-		a <- inferValue ctx a
-		t' <- inferMul v a
-		Just $ t == ValueType t'
-	check ctx (SetDivExpr v a) t = do
-		v <- inferValue ctx v
-		a <- inferValue ctx a
-		t' <- inferDiv v a
-		Just $ t == ValueType t'
-	check ctx (SetModExpr v a) t = do
-		v <- inferValue ctx v
-		a <- inferValue ctx a
-		t' <- inferMod v a
-		Just $ t == ValueType t'
-		
-	check ctx (PreIncExpr v) t = do
-		v <- inferValue ctx v
-		toMaybe (v == LSLInteger) $ t == ValueType LSLInteger
-	check ctx (PostIncExpr v) t = do
-		v <- inferValue ctx v
-		toMaybe (v == LSLInteger) $ t == ValueType LSLInteger
-	check ctx (PreDecExpr v) t = do
-		v <- inferValue ctx v
-		toMaybe (v == LSLInteger) $ t == ValueType LSLInteger
-	check ctx (PostDecExpr v) t = do
-		v <- inferValue ctx v
-		toMaybe (v == LSLInteger) $ t == ValueType LSLInteger
-		
 	infer ctx (LitExpr a) = infer ctx a
 	
 	infer ctx (VarExpr v) = infer ctx v
 	
 	infer ctx (ParenExpr a) = infer ctx a
 	
+	infer ctx (VectorExpr x y z) = do
+		x <- inferValue ctx x
+		y <- inferValue ctx y
+		z <- inferValue ctx z
+		toMaybe (numeric x && numeric y && numeric z) $ ValueType LSLVector
+	infer ctx (RotationExpr x y z s) = do
+		x <- inferValue ctx x
+		y <- inferValue ctx y
+		z <- inferValue ctx z
+		s <- inferValue ctx s
+		toMaybe (numeric x && numeric y && numeric z && numeric s) $ ValueType LSLRotation
 	infer ctx (ListExpr as) = do
 		_ <- inferList ctx as
 		Just $ ValueType LSLList
@@ -397,7 +251,7 @@ Checkable Expr where
 	infer ctx (SetExpr v a) = do
 		v <- inferValue ctx v
 		a <- inferValue ctx a
-		toMaybe (v == a) $ ValueType v
+		toMaybe (v == a || (v == LSLFloat && a == LSLInteger)) $ ValueType v
 	infer ctx (SetAddExpr v a) = do
 		v <- inferValue ctx v
 		a <- inferValue ctx a
@@ -425,17 +279,17 @@ Checkable Expr where
 		Just $ ValueType t
 		
 	infer ctx (PreIncExpr v) = do
-		v <- inferValue ctx v
-		toMaybe (v == LSLInteger) $ ValueType LSLInteger
+		v <- checkValue ctx v LSLInteger
+		toMaybe v $ ValueType LSLInteger
 	infer ctx (PostIncExpr v) = do
-		v <- inferValue ctx v
-		toMaybe (v == LSLInteger) $ ValueType LSLInteger
+		v <- checkValue ctx v LSLInteger
+		toMaybe v $ ValueType LSLInteger
 	infer ctx (PreDecExpr v) = do
-		v <- inferValue ctx v
-		toMaybe (v == LSLInteger) $ ValueType LSLInteger
+		v <- checkValue ctx v LSLInteger
+		toMaybe v $ ValueType LSLInteger
 	infer ctx (PostDecExpr v) = do
-		v <- inferValue ctx v
-		toMaybe (v == LSLInteger) $ ValueType LSLInteger
+		v <- checkValue ctx v LSLInteger
+		toMaybe v $ ValueType LSLInteger
 		
 interface ScopedCheckable r where
 	scopedInfer : Map Symbol SymbolType -> Map Symbol SymbolType -> r -> Maybe (SymbolType, Map Symbol SymbolType)
@@ -473,29 +327,29 @@ ScopedCheckable Stmt where
 		_ <- scopedInferList (new ++ old) (getLabelMap body) body
 		Just (NoneType, new)
 		
-	scopedInfer old new DefaultState = Just (NoneType, new)
+	scopedInfer old new DefaultStmt = Just (NoneType, new)
 	scopedInfer old new (StateStmt v) = do
 		v <- check (new ++ old) v StateType
 		toMaybe v (NoneType, new)
 		
 	scopedInfer old new (IfStmt test tb fb) = do
 		_ <- infer (new ++ old) test
-		_ <- scopedInferList (new ++ old) (getLabelMap tb) tb
-		_ <- maybe (Just ()) (\fb => scopedInferList (new ++ old) (getLabelMap fb) fb) fb
+		_ <- scopedInfer (new ++ old) [] tb
+		_ <- map (scopedInfer (new ++ old) []) fb
 		Just (NoneType, new)
 	scopedInfer old new (DoWhileStmt body test) = do
 		_ <- infer (new ++ old) test
-		_ <- scopedInferList (new ++ old) (getLabelMap body) body
+		_ <- scopedInfer (new ++ old) [] body
 		Just (NoneType, new)
 	scopedInfer old new (ForStmt pres test posts body) = do
-		_ <- infer (new ++ old) test
+		_ <- infer (new ++ old) $ maybe (LitExpr $ IntLit 1) id test
 		_ <- inferList (new ++ old) pres
 		_ <- inferList (new ++ old) posts
-		_ <- scopedInferList (new ++ old) (getLabelMap body) body
+		_ <- scopedInfer (new ++ old) [] body
 		Just (NoneType, new)
 	scopedInfer old new (WhileStmt test body) = do
 		_ <- infer (new ++ old) test
-		_ <- scopedInferList (new ++ old) (getLabelMap body) body
+		_ <- scopedInfer (new ++ old) [] body
 		Just (NoneType, new)
 	
 	scopedInfer old new (JumpStmt v) = do
@@ -508,35 +362,32 @@ ScopedCheckable Stmt where
 		Just (NoneType, new)
 
 ScopedCheckable Event where
-	scopedInfer old new (Evt def args body) = do
-		_ <- scopedInferList (namedArgs def args ++ new ++ old) [] body
+	scopedInfer old new e = do
+		_ <- scopedInferList (namedArgs (type e) (args e) ++ new ++ old) [] (body e)
 		Just (EventType, [])
 	
-checkDupedEvents : List Event -> Bool
+private total checkDupedEvents : List Event -> Bool
 checkDupedEvents [] = False
 checkDupedEvents (a :: as) = elemBy checkDupe a as || checkDupedEvents as where
 	checkDupe : Event -> Event -> Bool
-	checkDupe (Evt def _ _) (Evt def' _ _) = eventName def == eventName def' -- TODO: Add a proper Eq implementation
+	checkDupe e e' = eventName (type e) == eventName (type e') -- TODO: Add a proper Eq implementation
 	
 ScopedCheckable State where
-	scopedInfer old new (DefaultState evts) = do
-		_ <- scopedInferList old new evts
-		toMaybe (not (checkDupedEvents evts) && length evts > 0) (StateType, [])
-	scopedInfer old new (UserState _ evts) = do
+	scopedInfer old new s = let evts = body s in do
 		_ <- scopedInferList old new evts
 		toMaybe (not (checkDupedEvents evts) && length evts > 0) (StateType, [])
 	
 ScopedCheckable Function where
-	scopedInfer old new (Func ret name args body) = do
-		_ <- scopedInferList old new body
-		Just (FnType ret $ map snd args, [])
+	scopedInfer old new f = do
+		_ <- scopedInferList old new (body f)
+		Just (FnType (result f) $ map snd (args f), [])
 	
-checkDupedSymbols : List Symbol -> Bool
+private total checkDupedSymbols : List Symbol -> Bool
 checkDupedSymbols [] = False
 checkDupedSymbols (a :: as) = elem a as || checkDupedSymbols as
 	
-ScopedCheckable Program where
-	scopedInfer old new (Script globals funcs states) = let globals = map (\(n, t) => (n, ValueType t)) globals in do
-		_ <- scopedInferList (globals ++ old) new funcs
-		_ <- scopedInferList (globals ++ old) new states
-		toMaybe (not $ checkDupedSymbols (map fst globals ++ map funcName funcs)) (NoneType, [])
+ScopedCheckable Script where
+	scopedInfer old new s = let globals = map (\(n, t) => (n, ValueType t)) (globals s) in do
+		_ <- scopedInferList (globals ++ old) new (funcs s)
+		_ <- scopedInferList (globals ++ old) new (states s)
+		toMaybe (not $ checkDupedSymbols (map fst globals ++ map name (funcs s) ++ map stateName (states s))) (NoneType, [])
