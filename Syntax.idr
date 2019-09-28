@@ -6,13 +6,8 @@ import LSL.Helpers
 
 %access public export
 
-data Symbol = Var String
-
-Eq Symbol where
-	(Var a) == (Var a') = a == a'
-
-Show Symbol where
-	show (Var a) = a
+Symbol : Type
+Symbol = String
 
 data LSLType
 	= LSLInteger
@@ -72,16 +67,12 @@ data Literal
 	| FloatLit Double
 	| StringLit String
 	| KeyLit String
-	| VectorLit Double Double Double
-	| RotationLit Double Double Double Double
 	
 Show Literal where
 	show (IntLit a) = show a
 	show (FloatLit a) = show a
 	show (StringLit a) = "\"" ++ a ++ "\""
 	show (KeyLit a) = a
-	show (VectorLit x y z) = "<" ++ show x ++ ", " ++ show y ++ ", " ++ show z ++ ">"
-	show (RotationLit x y z s) = "<" ++ show x ++ ", " ++ show y ++ ", " ++ show z ++ ", " ++ show s ++ ">"
 	
 data Expr
 	= LitExpr Literal
@@ -90,6 +81,8 @@ data Expr
 	
 	| ParenExpr Expr
 	
+	| VectorExpr Expr Expr Expr
+	| RotationExpr Expr Expr Expr Expr
 	| ListExpr (List Expr)
 	
 	| CastExpr LSLType Expr
@@ -137,10 +130,12 @@ data Expr
 Show Expr where
 	show (LitExpr a) = show a
 	
-	show (VarExpr a) = show a
+	show (VarExpr a) = a
 	
 	show (ParenExpr a) = "(" ++ show a ++ ")"
 	
+	show (VectorExpr x y z) = "<" ++ show x ++ ", " ++ show y ++ ", " ++ show z ++ ">"
+	show (RotationExpr x y z s) = "<" ++ show x ++ ", " ++ show y ++ ", " ++ show z ++ ", " ++ show s ++ ">"
 	show (ListExpr as) = show as
 	
 	show (CastExpr t a) = "(" ++ show t ++ ")" ++ show a
@@ -173,17 +168,17 @@ Show Expr where
 	
 	show (FnExpr v as) = show v ++ "(" ++ joinSepShow ", " as ++ ")"
 	
-	show (SetExpr v a) = show v ++ " = " ++ show a
-	show (SetAddExpr v a) = show v ++ " += " ++ show a
-	show (SetSubExpr v a) = show v ++ " -= " ++ show a
-	show (SetMulExpr v a) = show v ++ " *= " ++ show a
-	show (SetDivExpr v a) = show v ++ " /= " ++ show a
-	show (SetModExpr v a) = show v ++ " %= " ++ show a
+	show (SetExpr v a) = v ++ " = " ++ show a
+	show (SetAddExpr v a) = v ++ " += " ++ show a
+	show (SetSubExpr v a) = v ++ " -= " ++ show a
+	show (SetMulExpr v a) = v ++ " *= " ++ show a
+	show (SetDivExpr v a) = v ++ " /= " ++ show a
+	show (SetModExpr v a) = v ++ " %= " ++ show a
 	
-	show (PreIncExpr v) = "++" ++ show v
-	show (PostIncExpr v) = show v ++ "++"
-	show (PreDecExpr v) = "--" ++ show v
-	show (PostDecExpr v) = show v ++ "--"
+	show (PreIncExpr v) = "++" ++ v
+	show (PostIncExpr v) = v ++ "++"
+	show (PreDecExpr v) = "--" ++ v
+	show (PostDecExpr v) = v ++ "--"
 
 data Stmt
 	= ExprStmt Expr
@@ -194,38 +189,52 @@ data Stmt
 	| DefaultStmt
 	| StateStmt Symbol
 	
-	| IfStmt Expr (List Stmt) (Maybe (List Stmt))
-	| DoWhileStmt (List Stmt) Expr
-	| ForStmt (List Expr) Expr (List Expr) (List Stmt)
-	| WhileStmt Expr (List Stmt)
+	| IfStmt Expr Stmt (Maybe Stmt)
+	| DoWhileStmt Stmt Expr
+	| ForStmt (List Expr) (Maybe Expr) (List Expr) Stmt
+	| WhileStmt Expr Stmt
 	
 	| JumpStmt Symbol
 	| LabelStmt Symbol
 	
 	| ReturnStmt (Maybe Expr)
 	
-Show Stmt where
-	show (ExprStmt a) = show a ++ ";\n"
-	show (DefStmt t v a) = show t ++ " " ++ show v ++ maybe ";" (\a => show a ++ ";") a
+interface ShowTabbed r where
+	showTabbed : Nat -> r -> String
 	
-	show (ScopeStmt body) = "{\n" ++ joinShow body ++ "}\n"
+ShowTabbed String where
+	showTabbed n a = join (replicate n "    ") ++ a
 	
-	show DefaultStmt = "default" ++ ";\n"
-	show (StateStmt v) = "state " ++ show v ++ ";\n"
+ShowTabbed a => ShowTabbed (List a) where
+	showTabbed n as = join $ map (\a => showTabbed n a ++ "\n") as
 	
-	show (IfStmt c t f) = "if (" ++ show c ++ ") {\n"
-		++ joinShow t ++ "}"
-		++ maybe "\n" (\f => " else {\n" ++ joinShow f ++ "}\n") f
-	show (DoWhileStmt body test) = "do {\n" ++ joinShow body ++ "} while (" ++ show test ++ ");\n"
-	show (ForStmt pre test post body) = "for (" ++ joinSepShow ", " pre ++ "; " ++ show test ++ "; " ++ joinSepShow ", " post ++ ") {\n"
-		++ joinShow body
-		++ "}\n"
-	show (WhileStmt test body) = "while (" ++ show test ++ ") {\n" ++ joinShow body ++ "}\n"
-	
-	show (JumpStmt v) = "jump " ++ show v ++ ";\n"
-	show (LabelStmt v) = "@" ++ show v ++ ";\n"
-	
-	show (ReturnStmt a) = "return " ++ maybe "" show a ++ ";\n"
+mutual
+	private showTabbedBody : Nat -> Stmt -> String
+	showTabbedBody n (ScopeStmt body) = "{\n" ++ showTabbed (S n) body ++ showTabbed n "}"
+	showTabbedBody _ a = showTabbed 0 a
+		
+	ShowTabbed Stmt where
+		showTabbed n (ExprStmt a) = showTabbed n $ show a ++ ";"
+		showTabbed n (DefStmt t v a) = showTabbed n $ show t ++ " " ++ v ++ maybe ";" (\a => " = " ++ show a ++ ";") a
+		
+		showTabbed n (ScopeStmt body) = showTabbed n "{\n" ++ showTabbed (S n) body ++ showTabbed n "}"
+		
+		showTabbed n DefaultStmt = showTabbed n $ "default;"
+		showTabbed n (StateStmt v) = showTabbed n $ "state " ++ show v ++ ";"
+		
+		showTabbed n (IfStmt c t f) = showTabbed n ("if (" ++ show c ++ ") ")
+			++ showTabbedBody n t
+			++ maybe "" (\a => " else " ++ showTabbedBody n a) f
+		showTabbed n (DoWhileStmt body test) = showTabbed n "do " ++ showTabbedBody n body ++ "while (" ++ show test ++ ");"
+		showTabbed n (ForStmt pre test post body) = showTabbed n ("for (" ++ joinSepShow ", " pre ++ "; " ++ show @{blank} test ++ "; " ++ joinSepShow ", " post ++ ") ")
+			++ showTabbedBody n body
+		showTabbed n (WhileStmt test body) = showTabbed n ("while (" ++ show test ++ ") ")
+			++ showTabbedBody n body
+		
+		showTabbed n (JumpStmt v) = showTabbed n $ "jump " ++ show v ++ ";"
+		showTabbed n (LabelStmt v) = showTabbed n $ "@" ++ show v ++ ";"
+		
+		showTabbed n (ReturnStmt a) = showTabbed n $ "return " ++ maybe "" show a ++ ";"
 	
 data EventData : String -> List LSLType -> Type where
 	AttachEvent : EventData "attach" [LSLKey]
@@ -290,40 +299,54 @@ eventName {name} _ = name
 
 total eventArgs : EventData name args -> List LSLType
 eventArgs {args} _ = args
-	
-data Event
-	= Evt (EventData name args) (Vect (length args) Symbol) (List Stmt)
-	
+
 total namedArgs : EventData name types -> Vect (length types) Symbol -> Map Symbol SymbolType
 namedArgs {types} _ args = zip (toList args) $ map ValueType types
+	
+record Event where
+	constructor MkEvent
+	type : EventData n ts
+	args : Vect (length ts) Symbol
+	body : List Stmt
 
-total showArgs : Map Symbol SymbolType -> String
+private total showArgs : Map Symbol SymbolType -> String
 showArgs as = join $ intersperse ", " $ map (\(n, t) => show t ++ " " ++ show n) as
 	
-Show Event where
-	show (Evt def args body) = eventName def ++ "(" ++ showArgs (namedArgs def args) ++ ") {\n" ++ joinShow body ++ "}\n"
-
-data State
-	= DefaultState (List Event)
-	| UserState Symbol (List Event)
-
-Show State where
-	show (DefaultState evts) = "default {\n" ++ joinShow evts ++ "}\n"
-	show (UserState name evts) = "state " ++ show name ++ " {\n" ++ joinShow evts ++ "}\n"
+ShowTabbed Event where
+	showTabbed n e = showTabbed n (eventName (type e) ++ "(" ++ showArgs (namedArgs (type e) (args e)) ++ ") {\n")
+		++ showTabbed (S n) (body e)
+		++ showTabbed n "}"
 	
-data Function
-	= Func (Maybe LSLType) Symbol (Map Symbol LSLType) (List Stmt)
+record State where
+	constructor MkState
+	name : Maybe Symbol
+	body : List Event
 
-total funcName : Function -> Symbol
-funcName (Func _ name _ _) = name
+total stateName : State -> Symbol
+stateName s = maybe "default" id $ name s
+
+ShowTabbed State where
+	showTabbed n s = showTabbed n (stateName s ++ " {\n") ++ showTabbed (S n) (body s) ++ showTabbed n "}"
+
+record Function where
+	constructor MkFunction
+	result : Maybe LSLType
+	name : Symbol
+	args : Map Symbol LSLType
+	body : List Stmt
 
 Show Function where
-	show (Func ret name args body) = maybe "" (\r => show r ++ " ") ret ++ show name ++ " (" ++ showArgs (map (\(n, t) => (n, ValueType t)) args) ++ ") {\n" ++ joinShow body ++ "}\n"
+	show f = maybe "" (\r => show r ++ " ") (result f) ++ show (name f)
+		++ " (" ++ showArgs (map (\(n, t) => (n, ValueType t)) (args f)) ++ ") {\n"
+		++ showTabbed 1 (body f) ++ "}\n"
 
-data Program
-	= Script (Map Symbol LSLType) (List Function) (List State)
+record Script where
+	constructor MkScript
+	globals : Map Symbol LSLType
+	funcs : List Function
+	states : List State
 
-Show Program where
-	show (Script globals funcs states) = join (map showGlobal globals ++ map show funcs ++ map show states) where
+Show Script where
+	show s = join (map showGlobal (globals s) ++ map show (funcs s) ++ map (showTabbed 0) (states s)) where
 		total showGlobal : (Symbol, LSLType) -> String
 		showGlobal (n, t) = show t ++ " " ++ show n ++ ";\n"
