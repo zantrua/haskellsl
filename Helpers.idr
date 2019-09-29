@@ -8,6 +8,9 @@ Map a b = List (a, b)
 total andmap : (a -> Bool) -> List a -> Bool
 andmap f as = foldr (\a, b => a && b) True (map f as)
 
+total ormap : (a -> Bool) -> List a -> Bool
+ormap f as = foldr (\a, b => a || b) False (map f as)
+
 total join : List String -> String
 join = foldr (++) ""
 
@@ -21,4 +24,4 @@ total joinSepShow : Show a => String -> List a -> String
 joinSepShow sep as = joinSep sep $ map show as
 
 implementation [blank] Show a => Show (Maybe a) where
-    show a = maybe "" show a
+	show a = maybe "" show a
