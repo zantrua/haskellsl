@@ -166,7 +166,7 @@ Show Expr where
 	show (GtExpr a b) = show a ++ " > " ++ show b
 	show (GteExpr a b) = show a ++ " >= " ++ show b
 	
-	show (FnExpr v as) = show v ++ "(" ++ joinSepShow ", " as ++ ")"
+	show (FnExpr f as) = f ++ "(" ++ joinSepShow ", " as ++ ")"
 	
 	show (SetExpr v a) = v ++ " = " ++ show a
 	show (SetAddExpr v a) = v ++ " += " ++ show a
