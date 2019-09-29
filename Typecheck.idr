@@ -385,9 +385,12 @@ ScopedCheckable Function where
 private total checkDupedSymbols : List Symbol -> Bool
 checkDupedSymbols [] = False
 checkDupedSymbols (a :: as) = elem a as || checkDupedSymbols as
-	
+
+private hasDefaultState : Script -> Bool
+hasDefaultState s = ormap (\s => isNothing $ name s) $ states s
+
 ScopedCheckable Script where
 	scopedInfer old new s = let globals = map (\(n, t) => (n, ValueType t)) (globals s) in do
 		_ <- scopedInferList (globals ++ old) new (funcs s)
 		_ <- scopedInferList (globals ++ old) new (states s)
-		toMaybe (not $ checkDupedSymbols (map fst globals ++ map name (funcs s) ++ map stateName (states s))) (NoneType, [])
+		toMaybe (hasDefaultState s && (not $ checkDupedSymbols (map fst globals ++ map name (funcs s) ++ map stateName (states s)))) (NoneType, [])
