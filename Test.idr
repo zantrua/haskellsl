@@ -6,6 +6,7 @@ import LSL.Helpers
 import LSL.Syntax
 import LSL.Typecheck
 import LSL.Compile
+import LSL.Eval
 
 tests : List Script
 tests = [
@@ -27,10 +28,10 @@ tests = [
 				DefStmt LSLVector "b" Nothing,
 				IfStmt (VarExpr "a")
 					(ScopeStmt [
-						ExprStmt (SetExpr "a" (VectorExpr (LitExpr $ FloatLit 1) (LitExpr $ FloatLit 2) (LitExpr $ FloatLit 3)))
+						ExprStmt (SetExpr "a" Whole (VectorExpr (LitExpr $ FloatLit 1) (LitExpr $ FloatLit 2) (LitExpr $ FloatLit 3)))
 						])
 					(Just $ ScopeStmt [
-						ExprStmt (SetExpr "a" (VarExpr "b"))
+						ExprStmt (SetExpr "a" Whole (VarExpr "b"))
 						])
 			]
 		]
@@ -55,6 +56,26 @@ tests = [
 		MkState Nothing [
 			MkEvent EntryEvent [] [
 				ExprStmt $ MulExpr (LitExpr $ IntLit 4) $ AddExpr (LitExpr $ IntLit 5) (LitExpr $ IntLit 6)
+			]
+		]
+	],
+	MkScript [] [] [
+		MkState Nothing [
+			MkEvent EntryEvent [] [
+				DefStmt LSLVector "t" Nothing,
+				ExprStmt $ SetExpr "t" X (LitExpr $ IntLit 3)
+			]
+		]
+	]
+]
+
+negTests : List Script
+negTests = [
+	MkScript [] [] [
+		MkState Nothing [
+			MkEvent EntryEvent [] [
+				DefStmt LSLVector "t" Nothing,
+				ExprStmt $ SetExpr "t" S (LitExpr $ IntLit 3)
 			]
 		]
 	]
