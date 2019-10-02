@@ -248,35 +248,40 @@ Checkable Expr where
 				toMaybe (andmap (maybe False id) checks) $ maybe NoneType ValueType r
 			_ => Nothing
 			
-	infer ctx (SetExpr v a) = do
+	infer ctx (SetExpr v c a) = do
 		v <- inferValue ctx v
 		a <- inferValue ctx a
-		toMaybe (v == a || (v == LSLFloat && a == LSLInteger)) $ ValueType v
-	infer ctx (SetAddExpr v a) = do
+		toMaybe (hasComponent v c && isNumeric a) $ ValueType v
+	infer ctx (SetAddExpr v c a) = do
 		v <- inferValue ctx v
 		a <- inferValue ctx a
-		t <- inferAdd v a
-		Just $ ValueType t
-	infer ctx (SetSubExpr v a) = do
+		case c of
+			Whole => map ValueType $ inferAdd v a
+			c => toMaybe (hasComponent v c && isNumeric a) $ ValueType v
+	infer ctx (SetSubExpr v c a) = do
 		v <- inferValue ctx v
 		a <- inferValue ctx a
-		t <- inferSub v a
-		Just $ ValueType t
-	infer ctx (SetMulExpr v a) = do
+		case c of
+			Whole => map ValueType $ inferSub v a
+			c => toMaybe (hasComponent v c && isNumeric a) $ ValueType v
+	infer ctx (SetMulExpr v c a) = do
 		v <- inferValue ctx v
 		a <- inferValue ctx a
-		t <- inferMul v a
-		Just $ ValueType t
-	infer ctx (SetDivExpr v a) = do
+		case c of
+			Whole => map ValueType $ inferMul v a
+			c => toMaybe (hasComponent v c && isNumeric a) $ ValueType v
+	infer ctx (SetDivExpr v c a) = do
 		v <- inferValue ctx v
 		a <- inferValue ctx a
-		t <- inferDiv v a
-		Just $ ValueType t
-	infer ctx (SetModExpr v a) = do
+		case c of
+			Whole => map ValueType $ inferDiv v a
+			c => toMaybe (hasComponent v c && isNumeric a) $ ValueType v
+	infer ctx (SetModExpr v c a) = do
 		v <- inferValue ctx v
 		a <- inferValue ctx a
-		t <- inferMod v a
-		Just $ ValueType t
+		case c of
+			Whole => map ValueType $ inferMod v a
+			_ => Nothing
 		
 	infer ctx (PreIncExpr v) = do
 		v <- checkValue ctx v LSLInteger
@@ -305,7 +310,7 @@ getLabels = mapMaybe getLabel where
 	total getLabel : Stmt -> Maybe Symbol
 	getLabel (LabelStmt v) = Just v
 	getLabel _ = Nothing
-	
+
 private total getLabelMap  : List Stmt -> Map Symbol SymbolType
 getLabelMap as = let as = getLabels as in
 	zip as $ replicate (length as) LabelType
@@ -389,8 +394,19 @@ checkDupedSymbols (a :: as) = elem a as || checkDupedSymbols as
 private hasDefaultState : Script -> Bool
 hasDefaultState s = ormap (\s => isNothing $ name s) $ states s
 
+private checkGlobal : (Symbol, (LSLType, Maybe Expr)) -> Bool
+checkGlobal (_, (_, Nothing)) = True
+checkGlobal (_, (t, Just v)) = case infer [] v of
+	Nothing => False
+	Just vt => vt == ValueType t -- TODO: Check for valid initializer
+
+-- TODO: Check global values are valid
 ScopedCheckable Script where
-	scopedInfer old new s = let globals = map (\(n, t) => (n, ValueType t)) (globals s) in do
+	scopedInfer old new s = do
+		let validStates = hasDefaultState s
+		let validNames = not $ checkDupedSymbols (map fst (globals s) ++ map name (funcs s) ++ map stateName (states s))
+		let validGlobals = andmap checkGlobal $ globals s
+		let globals = map (\(n, (t, v)) => (n, ValueType t)) (globals s)
 		_ <- scopedInferList (globals ++ old) new (funcs s)
 		_ <- scopedInferList (globals ++ old) new (states s)
-		toMaybe (hasDefaultState s && (not $ checkDupedSymbols (map fst globals ++ map name (funcs s) ++ map stateName (states s)))) (NoneType, [])
+		toMaybe (validStates && validNames && validGlobals) (NoneType, [])
