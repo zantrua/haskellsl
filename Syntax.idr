@@ -6,7 +6,7 @@ import LSL.Helpers
 
 %access public export
 
-Symbol : Type
+total Symbol : Type
 Symbol = String
 
 data LSLType
@@ -17,6 +17,11 @@ data LSLType
 	| LSLVector
 	| LSLRotation
 	| LSLList
+	
+total isNumeric : LSLType -> Bool
+isNumeric LSLInteger = True
+isNumeric LSLFloat = True
+isNumeric _ = False
 	
 Eq LSLType where
 	LSLInteger == LSLInteger = True
@@ -74,6 +79,27 @@ Show Literal where
 	show (StringLit a) = "\"" ++ a ++ "\""
 	show (KeyLit a) = a
 	
+data Component
+	= Whole
+	| X
+	| Y
+	| Z
+	| S
+	
+total hasComponent : LSLType -> Component -> Bool
+hasComponent _ Whole = True
+hasComponent LSLVector S = False
+hasComponent LSLVector _ = True
+hasComponent LSLRotation _ = True
+hasComponent _ _ = False
+
+Show Component where
+	show Whole = ""
+	show X = ".x"
+	show Y = ".y"
+	show Z = ".z"
+	show S = ".s"
+	
 data Expr
 	= LitExpr Literal
 	
@@ -115,18 +141,64 @@ data Expr
 	
 	| FnExpr Symbol (List Expr)
 	
-	| SetExpr Symbol Expr
-	| SetAddExpr Symbol Expr
-	| SetSubExpr Symbol Expr
-	| SetMulExpr Symbol Expr
-	| SetDivExpr Symbol Expr
-	| SetModExpr Symbol Expr
+	| SetExpr Symbol Component Expr
+	| SetAddExpr Symbol Component Expr
+	| SetSubExpr Symbol Component Expr
+	| SetMulExpr Symbol Component Expr
+	| SetDivExpr Symbol Component Expr
+	| SetModExpr Symbol Component Expr
 	
 	| PreIncExpr Symbol
 	| PostIncExpr Symbol
 	| PreDecExpr Symbol
 	| PostDecExpr Symbol
 	
+total map : (Expr -> Expr) -> Expr -> Expr
+map f (ParenExpr a) = ParenExpr $ map f a
+
+map f (VectorExpr x y z) = VectorExpr (map f x) (map f y) (map f z)
+map f (RotationExpr x y z s) = RotationExpr (map f x) (map f y) (map f z) (map f s)
+map f (ListExpr as) = ListExpr $ map f as
+
+map f (CastExpr t a) = CastExpr t $ map f a
+
+map f (NotExpr a) = NotExpr $ map f a
+map f (AndExpr a b) = AndExpr (map f a) (map f b)
+map f (OrExpr a b) = OrExpr (map f a) (map f b)
+
+map f (BNotExpr a) = BNotExpr $ map f a
+map f (BAndExpr a b) = BAndExpr (map f a) (map f b) 
+map f (BOrExpr a b) = BOrExpr (map f a) (map f b)
+map f (BXorExpr a b) = BXorExpr (map f a) (map f b)
+
+map f (NegExpr a) = NegExpr $ map f a
+map f (AddExpr a b) = AddExpr (map f a) (map f b)
+map f (SubExpr a b) = SubExpr (map f a) (map f b)
+map f (MulExpr a b) = MulExpr (map f a) (map f b)
+map f (DivExpr a b) = DivExpr (map f a) (map f b)
+map f (ModExpr a b) = ModExpr (map f a) (map f b)
+
+map f (SHLExpr a b) = SHLExpr (map f a) (map f b)
+map f (SHRExpr a b) = SHRExpr (map f a) (map f b)
+
+map f (EqExpr a b) = EqExpr (map f a) (map f b)
+map f (NeExpr a b) = NeExpr (map f a) (map f b)
+map f (LtExpr a b) = LtExpr (map f a) (map f b)
+map f (LteExpr a b) = LteExpr (map f a) (map f b)
+map f (GtExpr a b) = GtExpr (map f a) (map f b)
+map f (GteExpr a b) = GteExpr (map f a) (map f b)
+
+map f (FnExpr fn as) = FnExpr fn $ map f as
+
+map f (SetExpr v c a) = SetExpr v c $ map f a
+map f (SetAddExpr v c a) = SetAddExpr v c $ map f a
+map f (SetSubExpr v c a) = SetSubExpr v c $ map f a
+map f (SetMulExpr v c a) = SetMulExpr v c $ map f a
+map f (SetDivExpr v c a) = SetDivExpr v c $ map f a
+map f (SetModExpr v c a) = SetModExpr v c $ map f a
+
+map _ a = a
+
 Show Expr where
 	show (LitExpr a) = show a
 	
@@ -168,12 +240,12 @@ Show Expr where
 	
 	show (FnExpr f as) = f ++ "(" ++ joinSepShow ", " as ++ ")"
 	
-	show (SetExpr v a) = v ++ " = " ++ show a
-	show (SetAddExpr v a) = v ++ " += " ++ show a
-	show (SetSubExpr v a) = v ++ " -= " ++ show a
-	show (SetMulExpr v a) = v ++ " *= " ++ show a
-	show (SetDivExpr v a) = v ++ " /= " ++ show a
-	show (SetModExpr v a) = v ++ " %= " ++ show a
+	show (SetExpr v c a) = v ++ show c ++ " = " ++ show a
+	show (SetAddExpr v c a) = v ++ show c ++ " += " ++ show a
+	show (SetSubExpr v c a) = v ++ show c ++ " -= " ++ show a
+	show (SetMulExpr v c a) = v ++ show c ++ " *= " ++ show a
+	show (SetDivExpr v c a) = v ++ show c ++ " /= " ++ show a
+	show (SetModExpr v c a) = v ++ show c ++ " %= " ++ show a
 	
 	show (PreIncExpr v) = "++" ++ v
 	show (PostIncExpr v) = v ++ "++"
@@ -198,6 +270,10 @@ data Stmt
 	| LabelStmt Symbol
 	
 	| ReturnStmt (Maybe Expr)
+	
+total unScope : Stmt -> List Stmt
+unScope (ScopeStmt as) = as
+unScope _ = []
 	
 interface ShowTabbed r where
 	showTabbed : Nat -> r -> String
@@ -342,11 +418,11 @@ Show Function where
 
 record Script where
 	constructor MkScript
-	globals : Map Symbol LSLType
+	globals : Map Symbol (LSLType, Maybe Expr)
 	funcs : List Function
 	states : List State
 
 Show Script where
 	show s = join (map showGlobal (globals s) ++ map show (funcs s) ++ map (showTabbed 0) (states s)) where
-		total showGlobal : (Symbol, LSLType) -> String
-		showGlobal (n, t) = show t ++ " " ++ show n ++ ";\n"
+		showGlobal : (Symbol, (LSLType, Maybe Expr)) -> String
+		showGlobal (n, (t, v)) = show t ++ " " ++ show n ++ maybe "" (\e => " " ++ show e) v
