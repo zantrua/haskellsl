@@ -59,12 +59,12 @@ Unused Expr where
 	
 	usedVars (FnExpr f as) = f :: (usedList as)
 	
-	usedVars (SetExpr v a) = v :: (usedVars a)
-	usedVars (SetAddExpr v a) = v :: (usedVars a)
-	usedVars (SetSubExpr v a) = v :: (usedVars a)
-	usedVars (SetMulExpr v a) = v :: (usedVars a)
-	usedVars (SetDivExpr v a) = v :: (usedVars a)
-	usedVars (SetModExpr v a) = v :: (usedVars a)
+	usedVars (SetExpr v _ a) = v :: (usedVars a)
+	usedVars (SetAddExpr v _ a) = v :: (usedVars a)
+	usedVars (SetSubExpr v _ a) = v :: (usedVars a)
+	usedVars (SetMulExpr v _ a) = v :: (usedVars a)
+	usedVars (SetDivExpr v _ a) = v :: (usedVars a)
+	usedVars (SetModExpr v _ a) = v :: (usedVars a)
 	
 	usedVars (PreIncExpr v) = [v]
 	usedVars (PostIncExpr v) = [v]
@@ -105,10 +105,7 @@ Unused Stmt where
 	
 Unused Event where
 	usedVars e = (usedList $ body e) \\ (toList $ args e)
-	removeUnused e = MkEvent (type e) (args e) (unScope $ removeUnused $ ScopeStmt $ body e) where
-		unScope : Stmt -> List Stmt
-		unScope (ScopeStmt as) = as
-		unScope _ = []
+	removeUnused e = MkEvent (type e) (args e) (unScope $ removeUnused $ ScopeStmt $ body e)
 	
 Unused State where
 	usedVars s = usedList $ body s
@@ -149,38 +146,7 @@ Parens Expr where
 	addParens (RotationExpr x y z s) = RotationExpr (addParens x) (addParens y) (addParens z) (addParens s)
 	addParens (ListExpr as) = ListExpr $ map addParens as
 
-	addParens (CastExpr t a) = CastExpr t $ maybeParen a
-
-	addParens (NotExpr a) = NotExpr $ maybeParen a
-	addParens (AndExpr a b) = AndExpr (maybeParen a) (maybeParen b)
-	addParens (OrExpr a b) = OrExpr (maybeParen a) (maybeParen b)
-	addParens (BNotExpr a) = BNotExpr $ maybeParen a
-	addParens (BAndExpr a b) = BAndExpr (maybeParen a) (maybeParen b)
-	addParens (BOrExpr a b) = BOrExpr (maybeParen a) (maybeParen b)
-	addParens (BXorExpr a b) = BXorExpr (maybeParen a) (maybeParen b)
-	addParens (NegExpr a) = NegExpr $ maybeParen a
-	addParens (AddExpr a b) = AddExpr (maybeParen a) (maybeParen b)
-	addParens (SubExpr a b) = SubExpr (maybeParen a) (maybeParen b)
-	addParens (MulExpr a b) = MulExpr (maybeParen a) (maybeParen b)
-	addParens (DivExpr a b) = DivExpr (maybeParen a) (maybeParen b)
-	addParens (ModExpr a b) = ModExpr (maybeParen a) (maybeParen b)
-	addParens (SHLExpr a b) = SHLExpr (maybeParen a) (maybeParen b)
-	addParens (SHRExpr a b) = SHRExpr (maybeParen a) (maybeParen b)
-	addParens (EqExpr a b) = EqExpr (maybeParen a) (maybeParen b)
-	addParens (NeExpr a b) = NeExpr (maybeParen a) (maybeParen b)
-	addParens (LtExpr a b) = LtExpr (maybeParen a) (maybeParen b)
-	addParens (LteExpr a b) = LteExpr (maybeParen a) (maybeParen b)
-	addParens (GtExpr a b) = GtExpr (maybeParen a) (maybeParen b)
-	addParens (GteExpr a b) = GteExpr (maybeParen a) (maybeParen b)
-	addParens (FnExpr f as) = FnExpr f $ map maybeParen as
-	addParens (SetExpr v a) = SetExpr v $ maybeParen a
-	addParens (SetAddExpr v a) = SetAddExpr v $ maybeParen a
-	addParens (SetSubExpr v a) = SetSubExpr v $ maybeParen a
-	addParens (SetMulExpr v a) = SetMulExpr v $ maybeParen a
-	addParens (SetDivExpr v a) = SetDivExpr v $ maybeParen a
-	addParens (SetModExpr v a) = SetModExpr v $ maybeParen a
-
-	addParens a = a
+	addParens a = map maybeParen a
 
 Parens Stmt where
 	addParens (ExprStmt a) = ExprStmt $ addParens a
