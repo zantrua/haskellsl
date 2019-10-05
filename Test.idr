@@ -12,7 +12,7 @@ tests : List Script
 tests = [
 	MkScript [] [] [
 		MkState Nothing [
-			MkEvent EntryEvent [] [
+			MkEvent (index 32 lslEvents) [] [
 				DefStmt LSLInteger "a" (Just $ LitExpr $ IntLit 5),
 				DefStmt LSLInteger "b" (Just $ LitExpr $ IntLit 6),
 				IfStmt (EqExpr (VarExpr "a") (VarExpr "b"))
@@ -23,7 +23,7 @@ tests = [
 	],
 	MkScript [] [] [
 		MkState Nothing [
-			MkEvent EntryEvent [] [
+			MkEvent (index 32 lslEvents) [] [
 				DefStmt LSLVector "a" Nothing,
 				DefStmt LSLVector "b" Nothing,
 				IfStmt (VarExpr "a")
@@ -38,7 +38,7 @@ tests = [
 	],
 	MkScript [] [] [
 		MkState Nothing [
-			MkEvent EntryEvent [] [
+			MkEvent (index 32 lslEvents) [] [
 				ForStmt [] Nothing [] $ ScopeStmt [
 					DefStmt LSLInteger "a" Nothing
 				]
@@ -47,21 +47,21 @@ tests = [
 	],
 	MkScript [] [] [
 		MkState Nothing [
-			MkEvent EntryEvent [] [
+			MkEvent (index 32 lslEvents) [] [
 				ExprStmt $ LitExpr $ IntLit 4
 			]
 		]
 	],
 	MkScript [] [] [
 		MkState Nothing [
-			MkEvent EntryEvent [] [
+			MkEvent (index 32 lslEvents) [] [
 				ExprStmt $ MulExpr (LitExpr $ IntLit 4) $ AddExpr (LitExpr $ IntLit 5) (LitExpr $ IntLit 6)
 			]
 		]
 	],
 	MkScript [] [] [
 		MkState Nothing [
-			MkEvent EntryEvent [] [
+			MkEvent (index 32 lslEvents) [] [
 				DefStmt LSLVector "t" Nothing,
 				ExprStmt $ SetExpr "t" X (LitExpr $ IntLit 3)
 			]
@@ -73,7 +73,7 @@ negTests : List Script
 negTests = [
 	MkScript [] [] [
 		MkState Nothing [
-			MkEvent EntryEvent [] [
+			MkEvent (index 32 lslEvents) [] [
 				DefStmt LSLVector "t" Nothing,
 				ExprStmt $ SetExpr "t" S (LitExpr $ IntLit 3)
 			]
