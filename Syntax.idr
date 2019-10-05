@@ -312,84 +312,91 @@ mutual
 		
 		showTabbed n (ReturnStmt a) = showTabbed n $ "return " ++ maybe "" show a ++ ";"
 	
-data EventData : String -> List LSLType -> Type where
-	AttachEvent : EventData "attach" [LSLKey]
+record EventData where
+	constructor MkEventData
+	name : String
+	types : List LSLType
 	
-	AtRotTargetEvent : EventData "at_rot_target" [LSLInteger, LSLRotation, LSLRotation]
-	AtTargetEvent : EventData "at_target" [LSLInteger, LSLVector, LSLVector]
-	NotAtRotTarget : EventData "not_at_rot_target" []
-	NotAtTargetEvent : EventData "not_at_target" []
+Eq EventData where
+	e == e' = name e == name e'
 	
-	ChangedEvent : EventData "changed" [LSLInteger]
+Show EventData where
+	show e = name e
 	
-	CollisionEvent : EventData "collision" [LSLInteger]
-	CollisionStartEvent : EventData "collision_start" [LSLInteger]
-	CollisionEndEvent : EventData "collision_end" [LSLInteger]
+total lslEvents : List EventData
+lslEvents =
+	MkEventData "attach" [LSLKey] ::
 	
-	ControlEvent : EventData "control" [LSLKey, LSLInteger, LSLInteger]
+	MkEventData "at_rot_target" [LSLInteger, LSLRotation, LSLRotation] ::
+	MkEventData "at_target" [LSLInteger, LSLVector, LSLVector] ::
+	MkEventData "not_at_rot_target" [] ::
+	MkEventData "not_at_target" [] ::
 	
-	DataserverEvent : EventData "dataserver" [LSLKey, LSLString]
+	MkEventData "changed" [LSLInteger] ::
 	
-	ExpPermsEvent : EventData "run_time_permissions" [LSLKey]
-	ExpPermsDeniedEvent : EventData "experience_permissions" [LSLKey, LSLInteger]
+	MkEventData "collision" [LSLInteger] ::
+	MkEventData "collision_start" [LSLInteger] ::
+	MkEventData "collision_end" [LSLInteger] ::
 	
-	EmailEvent : EventData "email" [LSLString, LSLString, LSLString, LSLString, LSLInteger]
-	HTTPRequestEvent : EventData "http_request" [LSLKey, LSLString, LSLString]
-	HTTPResponseEvent : EventData "http_response" [LSLKey, LSLInteger, LSLList, LSLString]
-	LinkMessageEvent : EventData "link_message" [LSLInteger, LSLInteger, LSLString, LSLKey]
-	ListenEvent : EventData "listen" [LSLInteger, LSLString, LSLKey, LSLString]
-	RemoteDataEvent : EventData "remote_data" [LSLInteger, LSLKey, LSLKey, LSLString, LSLInteger, LSLString]
+	MkEventData "control" [LSLKey, LSLInteger, LSLInteger] ::
 	
-	LandCollisionEvent : EventData "land_collision" [LSLVector]
-	LandCollisionStartEvent : EventData "land_collision_start" [LSLVector]
-	LandCollisionEndEvent : EventData "land_collision_end" [LSLVector]
+	MkEventData "dataserver" [LSLKey, LSLString] ::
 	
-	MoneyEvent : EventData "money" [LSLKey, LSLInteger]
-	TxnResultEvent : EventData "transaction_result" [LSLKey, LSLInteger, LSLString]
+	MkEventData "run_time_permissions" [LSLKey] ::
+	MkEventData "experience_permissions" [LSLKey, LSLInteger] ::
 	
-	MovingStartEvent : EventData "moving_start" []
-	MovingEndEvent : EventData "moving_end" []
+	MkEventData "email" [LSLString, LSLString, LSLString, LSLString, LSLInteger] ::
+	MkEventData "http_request" [LSLKey, LSLString, LSLString] ::
+	MkEventData "http_response" [LSLKey, LSLInteger, LSLList, LSLString] ::
+	MkEventData "link_message" [LSLInteger, LSLInteger, LSLString, LSLKey] ::
+	MkEventData "listen" [LSLInteger, LSLString, LSLKey, LSLString] ::
+	MkEventData "remote_data" [LSLInteger, LSLKey, LSLKey, LSLString, LSLInteger, LSLString] ::
 	
-	SensorEvent : EventData "sensor" [LSLInteger]
-	NoSensorEvent : EventData "no_sensor" []
+	MkEventData "land_collision" [LSLVector] ::
+	MkEventData "land_collision_start" [LSLVector] ::
+	MkEventData "land_collision_end" [LSLVector] ::
 	
-	ObjectRezEvent : EventData "object_rez" [LSLKey]
+	MkEventData "money" [LSLKey, LSLInteger] ::
+	MkEventData "transaction_result" [LSLKey, LSLInteger, LSLString] ::
 	
-	OnRezEvent : EventData "on_rez" [LSLInteger]
+	MkEventData "moving_start" [] ::
+	MkEventData "moving_end" [] ::
 	
-	PathUpdateEvent : EventData "path_update" [LSLInteger, LSLList]
+	MkEventData "sensor" [LSLInteger] ::
+	MkEventData "no_sensor" [] ::
 	
-	PermsEvent : EventData "run_time_permissions" [LSLInteger]
+	MkEventData "object_rez" [LSLKey] ::
 	
-	EntryEvent : EventData "state_entry" []
-	ExitEvent : EventData "state_exit" []
+	MkEventData "on_rez" [LSLInteger] ::
 	
-	TimerEvent : EventData "timer" []
+	MkEventData "path_update" [LSLInteger, LSLList] ::
 	
-	TouchEvent : EventData "touch" [LSLInteger]
-	TouchStartEvent : EventData "touch_start" [LSLInteger]
-	TouchEndEvent : EventData "touch_end" [LSLInteger]
+	MkEventData "run_time_permissions" [LSLInteger] ::
 	
-total eventName : EventData name args -> String
-eventName {name} _ = name
+	MkEventData "state_entry" [] ::
+	MkEventData "state_exit" [] ::
+	
+	MkEventData "timer" [] ::
+	
+	MkEventData "touch" [LSLInteger] ::
+	MkEventData "touch_start" [LSLInteger] ::
+	MkEventData "touch_end" [LSLInteger] ::
+	Nil
 
-total eventArgs : EventData name args -> List LSLType
-eventArgs {args} _ = args
+total namedArgs : (e : EventData) -> Vect (length $ types e) Symbol -> Map Symbol SymbolType
+namedArgs e args = zipWith (\n, t => (n, ValueType t)) (toList args) (types e)
 
-total namedArgs : EventData name types -> Vect (length types) Symbol -> Map Symbol SymbolType
-namedArgs {types} _ args = zip (toList args) $ map ValueType types
-	
 record Event where
 	constructor MkEvent
-	type : EventData n ts
-	args : Vect (length ts) Symbol
+	type : EventData
+	args : Vect (length $ types type) Symbol
 	body : List Stmt
 
 private total showArgs : Map Symbol SymbolType -> String
 showArgs as = join $ intersperse ", " $ map (\(n, t) => show t ++ " " ++ show n) as
 	
 ShowTabbed Event where
-	showTabbed n e = showTabbed n (eventName (type e) ++ "(" ++ showArgs (namedArgs (type e) (args e)) ++ ") {\n")
+	showTabbed n e = showTabbed n (name $ type e) ++ "(" ++ showArgs (namedArgs (type e) (args e)) ++ ") {\n"
 		++ showTabbed (S n) (body e)
 		++ showTabbed n "}"
 	
