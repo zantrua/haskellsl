@@ -90,6 +90,7 @@ inferMul LSLFloat LSLVector = Just LSLVector
 inferMul LSLVector LSLInteger = Just LSLVector
 inferMul LSLVector LSLFloat = Just LSLVector
 inferMul LSLVector LSLVector = Just LSLVector
+inferMul LSLVector LSLRotation = Just LSLVector
 inferMul LSLRotation LSLRotation = Just LSLRotation
 inferMul _ _ = Nothing
 
@@ -100,6 +101,7 @@ inferDiv LSLFloat LSLInteger = Just LSLFloat
 inferDiv LSLFloat LSLFloat = Just LSLFloat
 inferDiv LSLVector LSLInteger = Just LSLVector
 inferDiv LSLVector LSLFloat = Just LSLVector
+inferDiv LSLVector LSLRotation = Just LSLVector
 inferDiv LSLRotation LSLRotation = Just LSLRotation
 inferDiv _ _ = Nothing
 
@@ -375,7 +377,7 @@ private total checkDupedEvents : List Event -> Bool
 checkDupedEvents [] = False
 checkDupedEvents (a :: as) = elemBy checkDupe a as || checkDupedEvents as where
 	checkDupe : Event -> Event -> Bool
-	checkDupe e e' = eventName (type e) == eventName (type e') -- TODO: Add a proper Eq implementation
+	checkDupe e e' = type e == type e'
 	
 ScopedCheckable State where
 	scopedInfer old new s = let evts = body s in do
@@ -404,6 +406,7 @@ checkGlobal (_, (t, Just v)) = case infer [] v of
 ScopedCheckable Script where
 	scopedInfer old new s = do
 		let validStates = hasDefaultState s
+		let validEvents = andmap (andmap (flip elem lslEvents . type) . body) $ states s
 		let validNames = not $ checkDupedSymbols (map fst (globals s) ++ map name (funcs s) ++ map stateName (states s))
 		let validGlobals = andmap checkGlobal $ globals s
 		let globals = map (\(n, (t, v)) => (n, ValueType t)) (globals s)
