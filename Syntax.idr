@@ -68,7 +68,7 @@ Show SymbolType where
 	show NoneType = "none"
 	
 data Literal
-	= IntLit Integer
+	= IntLit Int
 	| FloatLit Double
 	| StringLit String
 	| KeyLit String
@@ -103,7 +103,7 @@ Show Component where
 data Expr
 	= LitExpr Literal
 	
-	| VarExpr Symbol
+	| VarExpr Symbol -- TODO: add component accessor
 	
 	| ParenExpr Expr
 	
