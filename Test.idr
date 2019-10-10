@@ -66,6 +66,13 @@ tests = [
 				ExprStmt $ SetExpr "t" X (LitExpr $ IntLit 3)
 			]
 		]
+	],
+	MkScript [] [] [
+		MkState Nothing [
+			MkEvent (index 32 lslEvents) [] [
+				ExprStmt $ BNotExpr $ BNotExpr $ LitExpr $ IntLit 0
+			]
+		]
 	]
 ]
 
